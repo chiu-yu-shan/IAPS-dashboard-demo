@@ -903,7 +903,7 @@ function actionRowsForOverview(rows,kind){
   if(kind==='renewal')chips=[actionChip('已聯繫',actionValue(row,['是否已聯繫','續約聯繫狀態','續約聯繫','聯繫狀態'])),actionChip('續約機率',actionValue(row,['續約機率','續約可能性','Renewal Probability'])),actionChip('下一步',actionValue(row,['下一步','下一步行動','Next Action']))];
   if(kind==='followup'){
    const latest=[...(row.services||[])].sort((a,b)=>serviceDateValue(b)-serviceDateValue(a))[0]||{};
-   chips=[actionChip('下個追蹤',actionValue(latest,['下一個追蹤節點','下次追蹤','下一步','下一步行動'])||actionValue(row,['下一個追蹤節點','下次追蹤','下一步','下一步行動'])),actionChip('成果狀態',actionValue(latest,['成果狀態','成果階段','服務成果'])||actionValue(row,['成果狀態','成果階段','服務成果']))];
+   chips=[actionChip('下一步',actionValue(latest,['下一個追蹤節點','下次追蹤','下一步','下一步行動'])||actionValue(row,['下一個追蹤節點','下次追蹤','下一步','下一步行動'])),actionChip('成果狀態',actionValue(latest,['成果狀態','成果階段','服務成果'])||actionValue(row,['成果狀態','成果階段','服務成果']))];
   }
   const date=kind==='onboarding'?row.startText:kind==='renewal'?row.endText:row.recentServiceDate;
   return '<div class="list-row queue-row" onclick=\'openByName('+JSON.stringify(row.name)+')\'><div style="min-width:0"><div class="queue-row-top"><b>'+esc(row.name)+'</b><span class="date">'+esc(date||'')+'</span></div><div class="action-fields">'+chips.join('')+'</div></div></div>';
