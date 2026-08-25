@@ -464,12 +464,6 @@ body{
   border-radius:5px;padding:4px 8px;display:inline-flex;width:max-content;
 }
 .overview-impact-meta{font-size:11.5px;color:var(--muted);line-height:1.5}
-.action-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-2)}
-.action-row:last-child{border-bottom:0}.action-row-main{min-width:0}.action-row-name{font-weight:600;color:var(--ink)}
-.action-row-meta{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:310px}
-.action-chip{font-size:10.5px;font-weight:600;padding:3px 7px;border-radius:999px;white-space:nowrap;background:var(--orange-lt);color:var(--orange)}
-.action-chip.red{background:#fef2f2;color:var(--red)}.action-chip.green{background:var(--green-lt);color:var(--green)}
-.action-note{font-size:11.5px;color:var(--muted);margin:-5px 0 8px}
 
 /* ─── RESPONSIVE ─── */
 @media(max-width:980px){
@@ -511,13 +505,9 @@ body{
 </main></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
-// Test mode reads the JSON generated from the downloaded Excel exports.
-// Production mode keeps the existing Google Apps Script endpoint and Sheet permissions.
-const DATA_SOURCE={
- mode:'snapshot', // 'snapshot' | 'api'
- snapshotUrl:'./snapshot.json',
- apiBase:'https://script.google.com/macros/s/AKfycby5BjSXDdBpEBFBwfGMnFAvcSCPganxrSSnRAfnmEGSPSY8Yupw2VKOfHl5NEoktaD2/exec'
-};
+const API_BASE='https://script.google.com/macros/s/AKfycby5BjSXDdBpEBFBwfGMnFAvcSCPganxrSSnRAfnmEGSPSY8Yupw2VKOfHl5NEoktaD2/exec';
+const DATA_SHEET_URL='https://docs.google.com/spreadsheets/d/1o8ptque1Vl24st1ZWa1zrngou6eXBNwD/edit';
+const MEMBER_SHEET_URL='https://docs.google.com/spreadsheets/d/1o8ptque1Vl24st1ZWa1zrngou6eXBNwD/edit';
 let raw={startups:[],alumni:[],members:[],partners:[],events:[],services:[]}; let data={startups:[],alumni:[],members:[],partners:[],events:[],services:[]}; let viewMode='list'; let currentExport={page:'overview',title:'Overview',rows:[]}; let selectedRecipients={startups:new Set(),alumni:new Set()};
 const MARKET_OPTIONS=['台灣','日本','歐美','東南亞','印度','不明'];
 const LEVEL_OPTIONS=['鑽石','黃金','白金','加速器'];
@@ -843,39 +833,18 @@ function exportCurrentView(){
  XLSX.utils.book_append_sheet(wb,ws,safeFilePart(title).slice(0,31));
  XLSX.writeFile(wb,`IAPS_${safeFilePart(title)}_${todayText()}.xlsx`);
 }
-function attachServices(rows,services){return (rows||[]).map(row=>({...row,services:(services||[]).filter(service=>normalizeCompanyName(service.company)===normalizeCompanyName(row['公司名稱']||row['公司全稱']))}));}
 async function fetchType(type){
- const res=await fetch(`${DATA_SOURCE.apiBase}?type=${type}`);
+ const res=await fetch(`${API_BASE}?type=${type}`);
  if(!res.ok)throw new Error(`${type}: HTTP ${res.status}`);
  const json=await res.json();
+ // 相容目前 Apps Script：{status:'ok', data:[...]}
  if(json.status==='ok')return json.data||[];
+ // 相容新版 Apps Script：{startups:[...], alumni:[...], partners:[...], events:[...]}
  if(Array.isArray(json[type]))return json[type];
  if(Array.isArray(json.data))return json.data;
  throw new Error(`${type}: ${json.message||'API 回傳格式不符'}`);
 }
-function applyRawData(){
- data.services=raw.services||[];
- data.members=(raw.members||[]).map(normMember);
- data.startups=attachServices(raw.startups,data.services).map(x=>normStartup(x,'startups'));
- data.alumni=attachServices(raw.alumni,data.services).map(x=>normStartup(x,'alumni'));
- data.partners=(raw.partners||[]).map(normPartner);
- data.events=buildEventsWithServiceForms((raw.events||[]).map(normEvent),data.services);
- renderAll();
-}
-async function loadAll(){try{
- document.body.style.cursor='wait';
- if(DATA_SOURCE.mode==='snapshot'){
-  const res=await fetch(DATA_SOURCE.snapshotUrl,{cache:'no-store'});
-  if(!res.ok)throw new Error(`測試資料快照：HTTP ${res.status}`);
-  const snapshot=await res.json();
-  Object.keys(raw).forEach(k=>raw[k]=snapshot[k]||[]);
- }else{
-  const types=Object.keys(raw);
-  const results=await Promise.all(types.map(t=>fetchType(t)));
-  types.forEach((t,i)=>raw[t]=results[i]);
- }
- applyRawData();
-}catch(e){alert(`資料載入失敗（${DATA_SOURCE.mode}）：${e.message}`)}finally{document.body.style.cursor='default'}}
+async function loadAll(){try{document.body.style.cursor='wait'; const types=['startups','alumni','members','partners','events','services']; const results=await Promise.all(types.map(t=>fetchType(t).catch(e=>{console.warn(e.message);return []}))); types.forEach((t,i)=>raw[t]=results[i]); data.services=raw.services||[]; data.members=raw.members.map(normMember); data.startups=raw.startups.map(x=>normStartup(x,'startups')); data.alumni=raw.alumni.map(x=>normStartup(x,'alumni')); data.partners=raw.partners.map(normPartner); data.events=buildEventsWithServiceForms(raw.events.map(normEvent),data.services); renderAll();}catch(e){alert('連線失敗：'+e.message)}finally{document.body.style.cursor='default'}}
 function renderAll(){renderOverview();renderStartups('startups');renderStartups('alumni');renderPartners();renderEvents();renderMatch();}
 function showPage(id){document.querySelectorAll('.page,.detail').forEach(x=>x.classList.remove('active'));document.getElementById('page-'+id).classList.add('active');document.querySelectorAll('.nav').forEach(b=>b.classList.remove('active'));[...document.querySelectorAll('.nav')].find(b=>b.textContent.includes(id==='overview'?'總覽':id==='startups'?'新創資料庫':id==='alumni'?'歷史新創':id==='partners'?'合作對象':id==='events'?'活動':'AI'))?.classList.add('active')}
 
@@ -903,11 +872,7 @@ function recentServicedCompanies(days=90){
   return bt-at;
  }).slice(0,8);
 }
-function actionRows(rows,chipClass,chipText,meta){return rows.length?rows.slice(0,7).map(x=>`<div class="action-row"><div class="action-row-main"><div class="action-row-name" onclick='openByName(${JSON.stringify(x.name||x.company)})'>${esc(x.name||x.company||'未命名')}</div><div class="action-row-meta">${esc(meta(x))}</div></div><span class="action-chip ${chipClass}">${esc(chipText(x))}</span></div>`).join(''):'<div class="empty">目前無待處理資料</div>'}
-function attentionCompanies(){return data.startups.filter(s=>Number(s.serviceCount||0)===0||s.heatLevel==='none')}
-function incompleteServices(){return currentYearServices().filter(s=>!s.summary||((s.hasImpact||s.impactType)&&!s.impactType))}
-function recentFollowups(){return recentServicedCompanies(90).filter(s=>(s.services||[]).some(x=>!x.summary||((x.hasImpact||x.impactType)&&!x.impactType)))}
-function renderOverview(){const el=document.getElementById('page-overview'); const active=data.members.length?data.members.filter(m=>m.status==='有效'):data.startups; const now=new Date(); const in90=new Date(); in90.setDate(now.getDate()-90); const due90=new Date(); due90.setDate(now.getDate()+90); const recent=data.members.filter(m=>m.startDate&&m.startDate>=in90).slice(0,8); const expiring=active.filter(m=>m.endDate&&m.endDate>=now&&m.endDate<=due90).sort((a,b)=>a.endDate-b.endDate).slice(0,8); const recentServices=recentServicedCompanies(90); const pending=attentionCompanies(); const incomplete=incompleteServices(); const followups=recentFollowups(); const y=new Date().getFullYear(); currentExport={page:'overview',title:'Overview',rows:currentYearServices()}; el.innerHTML=`<div class="page-head"><div><h1 class="page-title">總覽 Overview</h1><div class="subtitle">靜態資料快照（2026/08/10）｜不連線正式 API</div></div></div><div class="grid4"><div class="card kpi p16"><small>現役會員</small><div class="num">${active.length}</div></div><div class="card kpi cyan p16"><small>歷史會員</small><div class="num">${data.alumni.length}</div></div><div class="card kpi orange p16"><small>待啟動／低互動</small><div class="num">${pending.length}</div></div><div class="card kpi green p16"><small>服務紀錄待補</small><div class="num">${incomplete.length}</div></div></div><div class="overview-note">本頁保留原有資料總覽，並加入管理待辦：目前來源未提供「未服務原因、下一步、預計完成日」，因此系統只標示待補，不自行推論。</div><div class="grid3 section"><div class="card p16"><h3>待啟動／低互動會員</h3><div class="action-note">建議補：服務狀態、未服務原因、下一步與 Owner。</div>${actionRows(pending,'',()=> '待確認',x=>`服務 ${x.serviceCount||0} 次｜互動 ${freqLabel(x.heatLevel)}`)}</div><div class="card p16"><h3>服務紀錄待補</h3><div class="action-note">大類可統計，但缺摘要或有效益細項時無法判讀具體成果。</div>${actionRows(incomplete,'red',()=> '待補摘要／細項',x=>`${dateOnly(x.date)}｜${x.serviceItem||x.serviceType||'服務紀錄'}`)}</div><div class="card p16"><h3>近期服務後待追蹤</h3><div class="action-note">近期服務紀錄仍缺摘要／成果細項，需補下一個追蹤節點。</div>${actionRows(followups,'',()=> '待填下一步',x=>`最近服務：${dateOnly(x.recentServiceDate||'')}`)}</div></div><div class="grid2 section"><div class="card p16"><h3>服務類型分布（${y} 年累計）</h3>${serviceTypeDistributionHtml()}</div><div class="card p16"><h3>效益追蹤</h3>${impactTrackingHtml()}</div></div><div class="grid3 section"><div class="card p16"><h3>近三個月新增會員</h3>${miniRows(recent,'startups')}</div><div class="card p16"><h3>即將到期會員（迄日前 3 個月）</h3>${miniRows(expiring,'startups','endText')}</div><div class="card p16"><h3>近三個月有服務紀錄會員</h3>${miniRows(recentServices,'startups','recentServiceDate')}</div></div><div class="grid2 section"><div class="card p16"><h3>產業 Treemap</h3><div class="treemap">${treemapHtml()}</div></div><div class="card p16"><h3>會員等級分布</h3>${bars(levelCounts(active),'level')}</div></div><div class="card p16 section"><h3>成立年份趨勢</h3>${yearBars(yearCounts(data.startups))}</div>`}
+function renderOverview(){const el=document.getElementById('page-overview'); const active=data.members.length?data.members.filter(m=>m.status==='有效'):data.startups; const now=new Date(); const in90=new Date(); in90.setDate(now.getDate()-90); const due90=new Date(); due90.setDate(now.getDate()+90); const recent=data.members.filter(m=>m.startDate&&m.startDate>=in90).slice(0,8); const expiring=active.filter(m=>m.endDate&&m.endDate>=now&&m.endDate<=due90).sort((a,b)=>a.endDate-b.endDate).slice(0,8); const recentServices=recentServicedCompanies(90); const y=new Date().getFullYear(); currentExport={page:'overview',title:'Overview',rows:currentYearServices()}; el.innerHTML=`<div class="page-head"><div><h1 class="page-title">總覽 Overview</h1><div class="subtitle">更新於 ${new Date().toLocaleDateString()}</div></div></div><div class="grid4"><div class="card kpi p16"><small>有效會員</small><div class="num">${active.length}</div></div><div class="card kpi cyan p16"><small>歷史會員</small><div class="num">${data.alumni.length}</div></div><div class="card kpi orange p16"><small>合作對象</small><div class="num">${data.partners.length}</div></div><div class="card kpi green p16"><small>已建檔活動</small><div class="num">${data.events.length}</div></div></div><div class="overview-note">活動數為目前已建檔活動，不代表完整年度活動總數。</div><div class="grid2 section"><div class="card p16"><h3>服務類型分布（${y} 年累計）</h3>${serviceTypeDistributionHtml()}</div><div class="card p16"><h3>效益追蹤</h3>${impactTrackingHtml()}</div></div><div class="grid3 section"><div class="card p16"><h3>近三個月新增會員</h3>${miniRows(recent,'startups')}</div><div class="card p16"><h3>即將到期會員（迄日前 3 個月）</h3>${miniRows(expiring,'startups','endText')}</div><div class="card p16"><h3>近三個月有服務紀錄會員</h3>${miniRows(recentServices,'startups','recentServiceDate')}</div></div><div class="grid2 section"><div class="card p16"><h3>產業 Treemap</h3><div class="treemap">${treemapHtml()}</div></div><div class="card p16"><h3>會員等級分布</h3>${bars(levelCounts(data.members),'level')}</div></div><div class="card p16 section"><h3>成立年份趨勢</h3>${yearBars(yearCounts(data.startups))}</div>`}
 function miniRows(arr,type,dateField='startText'){return arr.length?arr.map(x=>`<div class="list-row" onclick='openByName(${JSON.stringify(x.name)})'><b>${esc(x.name)}</b><span class="date">${esc(x[dateField]||'')}</span></div>`).join(''):'<div class="empty">目前無資料</div>'}
 function levelCounts(arr){const o={}; arr.forEach(m=>{const k=m.level||'未分類'; o[k]=(o[k]||0)+1}); return o}
 function yearCounts(arr){const o={}; arr.forEach(m=>{const k=m.startYear; if(k&&k!=='—')o[k]=(o[k]||0)+1}); return o}
@@ -1102,7 +1067,7 @@ function showImpactStartups(){showPage('startups'); setTimeout(()=>{document.get
 function filterByTag(tag){showPage('startups'); setTimeout(()=>{document.querySelectorAll('#multi-ind-startups input').forEach(x=>x.checked=x.value===tag); applyFilters('startups')},0)}
 function toggleMulti(id){document.querySelectorAll('.multi').forEach(m=>{if(m.id!==id)m.classList.remove('open')});document.getElementById(id).classList.toggle('open')}
 document.addEventListener('click',e=>{if(!e.target.closest('.multi'))document.querySelectorAll('.multi').forEach(m=>m.classList.remove('open'))})
-function editData(){alert('本測試版使用本機 Excel 快照。請更新來源 Excel 後重新產生 data/snapshot.json；此版本不會更動正式 Google Sheet 或 API。')}
+function editData(){if(confirm('資料修改請至 Google Sheet 更新，更新後重新整理網站即可同步。\n\n是否前往資料庫？')) window.open(DATA_SHEET_URL,'_blank')}
 function globalSearch(){const q=document.getElementById('globalSearch').value.toLowerCase(); if(!q)return; showPage('startups'); setTimeout(()=>{document.getElementById('q-startups').value=q; applyFilters('startups')},0)}
 loadAll();
 </script>
