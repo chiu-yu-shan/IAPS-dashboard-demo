@@ -531,6 +531,7 @@ body{
 const API_BASE='https://script.google.com/macros/s/AKfycby5BjSXDdBpEBFBwfGMnFAvcSCPganxrSSnRAfnmEGSPSY8Yupw2VKOfHl5NEoktaD2/exec';
 const DATA_SHEET_URL='https://docs.google.com/spreadsheets/d/1o8ptque1Vl24st1ZWa1zrngou6eXBNwD/edit';
 const MEMBER_SHEET_URL='https://docs.google.com/spreadsheets/d/1o8ptque1Vl24st1ZWa1zrngou6eXBNwD/edit';
+const MEMBER_SNAPSHOT_URL='./data/members.json';
 let raw={startups:[],alumni:[],members:[],partners:[],events:[],services:[]}; let data={startups:[],alumni:[],members:[],partners:[],events:[],services:[]}; let viewMode='list'; let currentExport={page:'overview',title:'Overview',rows:[]}; let selectedRecipients={startups:new Set(),alumni:new Set()};
 const MARKET_OPTIONS=['台灣','日本','歐美','東南亞','印度','不明'];
 const LEVEL_OPTIONS=['鑽石','黃金','白金','加速器'];
@@ -789,7 +790,7 @@ function normPartner(r){
   note:get(r,['主要洽談合作紀錄或現況','內部合作紀錄','合作紀錄','備註','說明','Note','note']),
   status:get(r,['合作狀態','狀態','Status','status'])||'待分類'
  }}
-function normMember(r){const startText=get(r,['起','起日','會員起日','合約起日','開始日期','入會日期','加入日期','Start Date']);const endText=get(r,['迄','迄日','會員迄日','合約迄日','結束日期','到期日','End Date']);return {...r,name:get(r,['公司全稱','公司名稱','公司','團隊名稱']),level:get(r,['等級','會員等級']),status:get(r,['狀態','會員狀態'])||'有效',startDate:parseDate(startText),endDate:parseDate(endText),startText,endText}}
+function normMember(r){const startText=get(r,['起','起日','會員起日','合約起日','開始日期','入會日期','加入日期','Start Date']);const endText=get(r,['迄','迄日','會員迄日','合約迄日','結束日期','到期日','End Date']);const contractStatus=get(r,['簽約狀態','狀態','會員狀態']);return {...r,name:get(r,['公司全稱','公司名稱','公司','團隊名稱']),level:get(r,['等級','會員等級']),status:contractStatus||'有效',contractStatus,startDate:parseDate(startText),endDate:parseDate(endText),startText,endText}}
 function splitNames(v){return String(v||'').split(/\n|、|,|，/).map(x=>x.trim()).filter(Boolean)}
 function normEvent(r){
  const startupsList=splitNames(get(r,['參與新創企業名稱','參與新創','參與團隊']));
@@ -867,7 +868,8 @@ async function fetchType(type){
  if(Array.isArray(json.data))return json.data;
  throw new Error(`${type}: ${json.message||'API 回傳格式不符'}`);
 }
-async function loadAll(){try{document.body.style.cursor='wait'; const types=['startups','alumni','members','partners','events','services']; const results=await Promise.all(types.map(t=>fetchType(t).catch(e=>{console.warn(e.message);return []}))); types.forEach((t,i)=>raw[t]=results[i]); data.services=raw.services||[]; data.members=raw.members.map(normMember); data.startups=raw.startups.map(x=>normStartup(x,'startups')); data.alumni=raw.alumni.map(x=>normStartup(x,'alumni')); data.partners=raw.partners.map(normPartner); data.events=buildEventsWithServiceForms(raw.events.map(normEvent),data.services); renderAll();}catch(e){alert('連線失敗：'+e.message)}finally{document.body.style.cursor='default'}}
+async function fetchMemberSnapshot(){const res=await fetch(MEMBER_SNAPSHOT_URL,{cache:'no-store'});if(!res.ok)throw new Error('members snapshot: HTTP '+res.status);const json=await res.json();return Array.isArray(json)?json:(json.members||[])}
+async function loadAll(){try{document.body.style.cursor='wait'; const types=['startups','alumni','members','partners','events','services']; const results=await Promise.all(types.map(t=>fetchType(t).catch(e=>{console.warn(e.message);return []}))); types.forEach((t,i)=>raw[t]=results[i]); const memberSnapshot=await fetchMemberSnapshot().catch(e=>{console.warn(e.message);return []}); if(memberSnapshot.length)raw.members=memberSnapshot; data.services=raw.services||[]; data.members=raw.members.map(normMember); data.startups=raw.startups.map(x=>normStartup(x,'startups')); data.alumni=raw.alumni.map(x=>normStartup(x,'alumni')); data.partners=raw.partners.map(normPartner); data.events=buildEventsWithServiceForms(raw.events.map(normEvent),data.services); renderAll();}catch(e){alert('連線失敗：'+e.message)}finally{document.body.style.cursor='default'}}
 function renderAll(){renderOverview();renderStartups('startups');renderStartups('alumni');renderPartners();renderEvents();renderMatch();}
 function showPage(id){document.querySelectorAll('.page,.detail').forEach(x=>x.classList.remove('active'));document.getElementById('page-'+id).classList.add('active');document.querySelectorAll('.nav').forEach(b=>b.classList.remove('active'));[...document.querySelectorAll('.nav')].find(b=>b.textContent.includes(id==='overview'?'總覽':id==='startups'?'新創資料庫':id==='alumni'?'歷史新創':id==='partners'?'合作對象':id==='events'?'活動':'AI'))?.classList.add('active')}
 
@@ -910,7 +912,7 @@ function actionRowsForOverview(rows,kind){
  if(!rows.length)return '<div class="empty">目前無資料</div>';
  return rows.map(row=>{
   let chips=[];
-  if(kind==='onboarding')chips=[actionChip('Onboarding',actionValue(row,['Onboarding','onboarding','Onboarding 狀態','入會 onboarding'])),actionChip('需求訪談',actionValue(row,['需求訪談是否完成','需求訪談完成','需求訪談','需求訪談狀態']))];
+  if(kind==='onboarding')chips=[actionChip('簽約',actionValue(row,['簽約狀態','狀態'])),actionChip('Onboarding',actionValue(row,['Onboarding','onboarding','Onboarding 狀態','入會 onboarding'])),actionChip('需求訪談',actionValue(row,['需求訪談是否完成','需求訪談完成','需求訪談','需求訪談狀態']))];
   if(kind==='renewal')chips=[actionChip('已聯繫',actionValue(row,['是否已聯繫','續約聯繫狀態','續約聯繫','聯繫狀態'])),actionChip('續約機率',actionValue(row,['續約機率','續約可能性','Renewal Probability'])),actionChip('下一步',actionValue(row,['下一步','下一步行動','Next Action']))];
   if(kind==='followup'){
    const latest=[...(row.services||[])].sort((a,b)=>serviceDateValue(b)-serviceDateValue(a))[0]||{};
@@ -958,9 +960,9 @@ function renderInactiveQueue(){
 function toggleInactiveQueue(){const panel=document.getElementById('inactive-queue-panel'),button=document.getElementById('inactive-queue-toggle');if(!panel||!button)return;const opening=panel.hidden;panel.hidden=!opening;button.setAttribute('aria-expanded',String(opening));button.textContent=opening?'收合工作佇列 ▴':'展開工作佇列 ▾'}
 function renderOverview(){
  const el=document.getElementById('page-overview');
- const active=overviewMembers().filter(row=>!row.status||row.status==='有效');
+ const active=overviewMembers().filter(row=>!/失效|終止|不續約|畢業/.test(String(row.status||'')));
  const now=new Date(),in90=new Date(now);in90.setDate(now.getDate()-90);const due90=new Date(now);due90.setDate(now.getDate()+90);
- const memberRows=active.map(row=>({...row,startDate:memberDate(row,'start'),endDate:memberDate(row,'end'),startText:memberDateText(row,'start'),endText:memberDateText(row,'end')}));
+ const memberRows=overviewMembers().map(row=>({...row,startDate:memberDate(row,'start'),endDate:memberDate(row,'end'),startText:memberDateText(row,'start'),endText:memberDateText(row,'end')}));
  const recent=memberRows.filter(row=>row.startDate&&row.startDate>=in90).sort((a,b)=>b.startDate-a.startDate).slice(0,8);
  const expiring=memberRows.filter(row=>row.endDate&&row.endDate>=now&&row.endDate<=due90).sort((a,b)=>a.endDate-b.endDate).slice(0,8);
  const recentServices=recentServicedCompanies(90),y=new Date().getFullYear();
