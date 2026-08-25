@@ -554,7 +554,7 @@ const INDUSTRY_RULES=[
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function splitList(v){return String(v||'').replace(/\r?\n/g,',').split(/[、,，;；/|]+/).map(x=>x.trim()).filter(Boolean)}
 function get(o,ks){for(const k of ks){if(o[k]!==undefined&&String(o[k]).trim())return String(o[k]).trim()}return ''}
-function parseDate(v){if(!v)return null; const s=String(v).replace(/\./g,'/').replace(/-/g,'/'); const d=new Date(s); return isNaN(d)?null:d}
+function parseDate(v){if(v===undefined||v===null||v==='')return null;const raw=String(v).trim();const serial=Number(raw);if(/^\d+(?:\.\d+)?$/.test(raw)&&serial>20000&&serial<100000){const d=new Date(Date.UTC(1899,11,30)+serial*86400000);return isNaN(d)?null:d}const s=raw.replace(/\./g,'/').replace(/-/g,'/');const d=new Date(s);return isNaN(d)?null:d}
 function normalizeCompanyName(v){return String(v||'').replace(/\s/g,'').replace(/股份有限公司|有限公司|公司/g,'')}
 function findMemberByName(name){
  const key=normalizeCompanyName(name);
@@ -562,8 +562,8 @@ function findMemberByName(name){
 }
 function getContractInfo(row,type,name){
  const member=findMemberByName(name);
- const startText=get(row,['起'])||(member&&member.startText)||'';
- const endText=get(row,['迄'])||(member&&member.endText)||'';
+ const startText=get(row,['起','起日','會員起日','合約起日','開始日期','入會日期','加入日期','Start Date'])||(member&&member.startText)||'';
+ const endText=get(row,['迄','迄日','會員迄日','合約迄日','結束日期','到期日','End Date'])||(member&&member.endText)||'';
  const startDate=parseDate(startText);
  const endDate=parseDate(endText);
  return {startText,endText,startDate,endDate};
@@ -789,7 +789,7 @@ function normPartner(r){
   note:get(r,['主要洽談合作紀錄或現況','內部合作紀錄','合作紀錄','備註','說明','Note','note']),
   status:get(r,['合作狀態','狀態','Status','status'])||'待分類'
  }}
-function normMember(r){return {...r,name:get(r,['公司全稱','公司名稱']),level:get(r,['等級']),status:get(r,['狀態']),startDate:parseDate(get(r,['起'])),endDate:parseDate(get(r,['迄'])),startText:get(r,['起']),endText:get(r,['迄'])}}
+function normMember(r){const startText=get(r,['起','起日','會員起日','合約起日','開始日期','入會日期','加入日期','Start Date']);const endText=get(r,['迄','迄日','會員迄日','合約迄日','結束日期','到期日','End Date']);return {...r,name:get(r,['公司全稱','公司名稱','公司','團隊名稱']),level:get(r,['等級','會員等級']),status:get(r,['狀態','會員狀態'])||'有效',startDate:parseDate(startText),endDate:parseDate(endText),startText,endText}}
 function splitNames(v){return String(v||'').split(/\n|、|,|，/).map(x=>x.trim()).filter(Boolean)}
 function normEvent(r){
  const startupsList=splitNames(get(r,['參與新創企業名稱','參與新創','參與團隊']));
@@ -902,6 +902,8 @@ function overviewMembers(){
   return {...profile,...member,name:member.name||profile.name||'未命名會員',services:profile.services||member.services||[],lastServiceDate:profile.lastServiceDate||member.lastServiceDate||'',owner:get(member,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])||get(profile,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])||profile.manager||profile.founder||''};
  });
 }
+function memberDateText(row,kind){const keys=kind==='start'?['起','起日','會員起日','合約起日','開始日期','入會日期','加入日期','Start Date']:['迄','迄日','會員迄日','合約迄日','結束日期','到期日','End Date'];return kind==='start'?(row.startText||row.contractStartText||get(row,keys)||''):(row.endText||row.contractEndText||get(row,keys)||'')}
+function memberDate(row,kind){return kind==='start'?(row.startDate||parseDate(memberDateText(row,'start'))):(row.endDate||parseDate(memberDateText(row,'end')))}
 function actionValue(row,keys){const value=get(row,keys);return value?String(value):''}
 function actionChip(label,value){return '<span class="action-field'+(value?'':' missing')+'"><b>'+esc(label)+'</b> '+esc(value||'尚未提供')+'</span>'}
 function actionRowsForOverview(rows,kind){
@@ -958,8 +960,9 @@ function renderOverview(){
  const el=document.getElementById('page-overview');
  const active=overviewMembers().filter(row=>!row.status||row.status==='有效');
  const now=new Date(),in90=new Date(now);in90.setDate(now.getDate()-90);const due90=new Date(now);due90.setDate(now.getDate()+90);
- const recent=active.filter(row=>row.startDate&&row.startDate>=in90).sort((a,b)=>b.startDate-a.startDate).slice(0,8);
- const expiring=active.filter(row=>row.endDate&&row.endDate>=now&&row.endDate<=due90).sort((a,b)=>a.endDate-b.endDate).slice(0,8);
+ const memberRows=active.map(row=>({...row,startDate:memberDate(row,'start'),endDate:memberDate(row,'end'),startText:memberDateText(row,'start'),endText:memberDateText(row,'end')}));
+ const recent=memberRows.filter(row=>row.startDate&&row.startDate>=in90).sort((a,b)=>b.startDate-a.startDate).slice(0,8);
+ const expiring=memberRows.filter(row=>row.endDate&&row.endDate>=now&&row.endDate<=due90).sort((a,b)=>a.endDate-b.endDate).slice(0,8);
  const recentServices=recentServicedCompanies(90),y=new Date().getFullYear();
  const owners=[...new Set(inactiveMembers().map(inactiveOwner).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'zh-Hant'));
  currentExport={page:'overview',title:'Overview',rows:currentYearServices()};
