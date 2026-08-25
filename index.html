@@ -476,6 +476,20 @@ body{
   .toggle{margin-left:0}
   .cards{grid-template-columns:1fr}
 }
+
+/* ─── OVERVIEW ACTION QUEUE ─── */
+.action-fields{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.action-field{font-size:11px;color:var(--ink-2);background:#fff;border:1px solid var(--line);border-radius:5px;padding:3px 6px;line-height:1.35}
+.action-field b{font-weight:600;color:var(--muted)}
+.action-field.missing{color:var(--faint);background:var(--bg)}
+.queue-row{display:block;cursor:pointer}
+.queue-row:hover{background:var(--blue-lt)}
+.queue-row-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.queue-row .date{white-space:nowrap}
+.queue-controls{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.queue-controls select{height:32px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--bg);padding:0 8px;color:var(--ink-2);font-size:12px}
+.queue-note{font-size:11.5px;color:var(--muted);margin:-2px 0 10px}
+
 </style>
 
 <style>
@@ -872,7 +886,76 @@ function recentServicedCompanies(days=90){
   return bt-at;
  }).slice(0,8);
 }
-function renderOverview(){const el=document.getElementById('page-overview'); const active=data.members.length?data.members.filter(m=>m.status==='有效'):data.startups; const now=new Date(); const in90=new Date(); in90.setDate(now.getDate()-90); const due90=new Date(); due90.setDate(now.getDate()+90); const recent=data.members.filter(m=>m.startDate&&m.startDate>=in90).slice(0,8); const expiring=active.filter(m=>m.endDate&&m.endDate>=now&&m.endDate<=due90).sort((a,b)=>a.endDate-b.endDate).slice(0,8); const recentServices=recentServicedCompanies(90); const y=new Date().getFullYear(); currentExport={page:'overview',title:'Overview',rows:currentYearServices()}; el.innerHTML=`<div class="page-head"><div><h1 class="page-title">總覽 Overview</h1><div class="subtitle">更新於 ${new Date().toLocaleDateString()}</div></div></div><div class="grid4"><div class="card kpi p16"><small>有效會員</small><div class="num">${active.length}</div></div><div class="card kpi cyan p16"><small>歷史會員</small><div class="num">${data.alumni.length}</div></div><div class="card kpi orange p16"><small>合作對象</small><div class="num">${data.partners.length}</div></div><div class="card kpi green p16"><small>已建檔活動</small><div class="num">${data.events.length}</div></div></div><div class="overview-note">活動數為目前已建檔活動，不代表完整年度活動總數。</div><div class="grid2 section"><div class="card p16"><h3>服務類型分布（${y} 年累計）</h3>${serviceTypeDistributionHtml()}</div><div class="card p16"><h3>效益追蹤</h3>${impactTrackingHtml()}</div></div><div class="grid3 section"><div class="card p16"><h3>近三個月新增會員</h3>${miniRows(recent,'startups')}</div><div class="card p16"><h3>即將到期會員（迄日前 3 個月）</h3>${miniRows(expiring,'startups','endText')}</div><div class="card p16"><h3>近三個月有服務紀錄會員</h3>${miniRows(recentServices,'startups','recentServiceDate')}</div></div><div class="grid2 section"><div class="card p16"><h3>產業 Treemap</h3><div class="treemap">${treemapHtml()}</div></div><div class="card p16"><h3>會員等級分布</h3>${bars(levelCounts(data.members),'level')}</div></div><div class="card p16 section"><h3>成立年份趨勢</h3>${yearBars(yearCounts(data.startups))}</div>`}
+function overviewMembers(){
+ const base=data.members&&data.members.length?data.members:data.startups;
+ return base.map(member=>{
+  const profile=[...data.startups,...data.alumni].find(x=>x.name===member.name)||{};
+  return {...profile,...member,name:member.name||profile.name||'未命名會員',services:profile.services||member.services||[],lastServiceDate:profile.lastServiceDate||member.lastServiceDate||'',owner:get(member,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])||get(profile,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])||profile.manager||profile.founder||''};
+ });
+}
+function actionValue(row,keys){const value=get(row,keys);return value?String(value):''}
+function actionChip(label,value){return '<span class="action-field'+(value?'':' missing')+'"><b>'+esc(label)+'</b> '+esc(value||'尚未提供')+'</span>'}
+function actionRowsForOverview(rows,kind){
+ if(!rows.length)return '<div class="empty">目前無資料</div>';
+ return rows.map(row=>{
+  let chips=[];
+  if(kind==='onboarding')chips=[actionChip('Onboarding',actionValue(row,['Onboarding','onboarding','Onboarding 狀態','入會 onboarding'])),actionChip('需求訪談',actionValue(row,['需求訪談是否完成','需求訪談完成','需求訪談','需求訪談狀態']))];
+  if(kind==='renewal')chips=[actionChip('已聯繫',actionValue(row,['是否已聯繫','續約聯繫狀態','續約聯繫','聯繫狀態'])),actionChip('續約機率',actionValue(row,['續約機率','續約可能性','Renewal Probability'])),actionChip('下一步',actionValue(row,['下一步','下一步行動','Next Action']))];
+  if(kind==='followup'){
+   const latest=[...(row.services||[])].sort((a,b)=>serviceDateValue(b)-serviceDateValue(a))[0]||{};
+   chips=[actionChip('下個追蹤',actionValue(latest,['下一個追蹤節點','下次追蹤','下一步','下一步行動'])||actionValue(row,['下一個追蹤節點','下次追蹤','下一步','下一步行動'])),actionChip('成果狀態',actionValue(latest,['成果狀態','成果階段','服務成果'])||actionValue(row,['成果狀態','成果階段','服務成果']))];
+  }
+  const date=kind==='onboarding'?row.startText:kind==='renewal'?row.endText:row.recentServiceDate;
+  return '<div class="list-row queue-row" onclick=\'openByName('+JSON.stringify(row.name)+')\'><div style="min-width:0"><div class="queue-row-top"><b>'+esc(row.name)+'</b><span class="date">'+esc(date||'')+'</span></div><div class="action-fields">'+chips.join('')+'</div></div></div>';
+ }).join('');
+}
+function dateStamp(value){const d=parseDate(value);return d?d.getTime():0}
+function inactiveMembers(){
+ const cutoff=Date.now()-90*24*60*60*1000;
+ return overviewMembers().filter(row=>{
+  const last=Math.max(dateStamp(row.lastServiceDate),...(row.services||[]).map(serviceDateValue),0);
+  return !last||last<cutoff;
+ }).map(row=>({...row,_lastInteraction:Math.max(dateStamp(row.lastServiceDate),...(row.services||[]).map(serviceDateValue),0)}));
+}
+function inactiveReason(row){return actionValue(row,['未啟動原因','未服務原因','長期未互動原因','原因','服務狀態'])}
+function inactiveDue(row){return actionValue(row,['預計處理日期','預計完成日','下一步日期','追蹤日期','Due Date'])}
+function inactiveRisk(row){return actionValue(row,['風險','風險／需協助','需協助','Risk'])}
+function inactiveOwner(row){return row.owner||actionValue(row,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])}
+function renderInactiveQueue(){
+ const host=document.getElementById('inactive-queue-view'); if(!host)return;
+ const dueFilter=document.getElementById('inactive-due-filter')?.value||'';
+ const lastFilter=document.getElementById('inactive-last-filter')?.value||'';
+ const ownerFilter=document.getElementById('inactive-owner-filter')?.value||'';
+ const sort=document.getElementById('inactive-sort')?.value||'due';
+ const now=Date.now(), thirty=now+30*24*60*60*1000, ninety=now-90*24*60*60*1000;
+ let rows=inactiveMembers().filter(row=>{
+  const due=dateStamp(inactiveDue(row));
+  if(dueFilter==='overdue'&&(!due||due>=now))return false;
+  if(dueFilter==='30days'&&(!due||due<now||due>thirty))return false;
+  if(dueFilter==='none'&&due)return false;
+  if(lastFilter==='none'&&row._lastInteraction)return false;
+  if(lastFilter==='90days'&&(!row._lastInteraction||row._lastInteraction>=ninety))return false;
+  return !ownerFilter||inactiveOwner(row)===ownerFilter;
+ });
+ rows.sort((a,b)=>{
+  if(sort==='last')return (a._lastInteraction||0)-(b._lastInteraction||0);
+  if(sort==='owner')return String(inactiveOwner(a)).localeCompare(String(inactiveOwner(b)),'zh-Hant');
+  const ad=dateStamp(inactiveDue(a))||Number.MAX_SAFE_INTEGER,bd=dateStamp(inactiveDue(b))||Number.MAX_SAFE_INTEGER;return ad-bd;
+ });
+ host.innerHTML=rows.length?rows.map(row=>'<div class="list-row queue-row" onclick=\'openByName('+JSON.stringify(row.name)+')\'><div style="min-width:0;width:100%"><div class="queue-row-top"><b>'+esc(row.name)+'</b><span class="date">'+esc(row._lastInteraction?new Date(row._lastInteraction).toLocaleDateString():'尚無互動紀錄')+'</span></div><div class="action-fields">'+actionChip('原因',inactiveReason(row))+actionChip('Owner',inactiveOwner(row))+actionChip('預計處理',inactiveDue(row))+actionChip('風險',inactiveRisk(row))+'</div></div></div>').join(''):'<div class="empty">沒有符合篩選條件的會員。</div>';
+}
+function renderOverview(){
+ const el=document.getElementById('page-overview');
+ const active=overviewMembers().filter(row=>!row.status||row.status==='有效');
+ const now=new Date(),in90=new Date(now);in90.setDate(now.getDate()-90);const due90=new Date(now);due90.setDate(now.getDate()+90);
+ const recent=active.filter(row=>row.startDate&&row.startDate>=in90).sort((a,b)=>b.startDate-a.startDate).slice(0,8);
+ const expiring=active.filter(row=>row.endDate&&row.endDate>=now&&row.endDate<=due90).sort((a,b)=>a.endDate-b.endDate).slice(0,8);
+ const recentServices=recentServicedCompanies(90),y=new Date().getFullYear();
+ const owners=[...new Set(inactiveMembers().map(inactiveOwner).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'zh-Hant'));
+ currentExport={page:'overview',title:'Overview',rows:currentYearServices()};
+ el.innerHTML='<div class="page-head"><div><h1 class="page-title">總覽 Overview</h1><div class="subtitle">更新於 '+new Date().toLocaleDateString()+'</div></div></div><div class="grid4"><div class="card kpi p16"><small>有效會員</small><div class="num">'+active.length+'</div></div><div class="card kpi cyan p16"><small>歷史會員</small><div class="num">'+data.alumni.length+'</div></div><div class="card kpi orange p16"><small>合作對象</small><div class="num">'+data.partners.length+'</div></div><div class="card kpi green p16"><small>已建檔活動</small><div class="num">'+data.events.length+'</div></div></div><div class="overview-note">活動數為目前已建檔活動，不代表完整年度活動總數；行動欄位若顯示「尚未提供」，代表來源資料尚未填寫，系統不自行推論。</div><div class="grid2 section"><div class="card p16"><h3>服務類型分布（'+y+' 年累計）</h3>'+serviceTypeDistributionHtml()+'</div><div class="card p16"><h3>效益追蹤</h3>'+impactTrackingHtml()+'</div></div><div class="grid3 section"><div class="card p16"><h3>近三個月新增會員</h3>'+actionRowsForOverview(recent,'onboarding')+'</div><div class="card p16"><h3>即將到期會員（迄日前 3 個月）</h3>'+actionRowsForOverview(expiring,'renewal')+'</div><div class="card p16"><h3>近三個月有服務紀錄會員</h3>'+actionRowsForOverview(recentServices,'followup')+'</div></div><div class="card p16 section"><h3>尚未啟動或長期未互動會員</h3><div class="queue-note">定義：尚無服務紀錄，或最後服務／互動已超過 90 天。可依預計處理日期、最後互動日與 Owner 篩選及排序。</div><div class="queue-controls"><select id="inactive-due-filter" onchange="renderInactiveQueue()"><option value="">預計處理：全部</option><option value="overdue">已逾期</option><option value="30days">30 天內到期</option><option value="none">未填日期</option></select><select id="inactive-last-filter" onchange="renderInactiveQueue()"><option value="">最後互動：全部</option><option value="none">尚無互動</option><option value="90days">超過 90 天</option></select><select id="inactive-owner-filter" onchange="renderInactiveQueue()"><option value="">Owner：全部</option>'+owners.map(owner=>'<option value="'+esc(owner)+'">'+esc(owner)+'</option>').join('')+'</select><select id="inactive-sort" onchange="renderInactiveQueue()"><option value="due">排序：預計處理日（近→遠）</option><option value="last">排序：最後互動日（舊→新）</option><option value="owner">排序：Owner</option></select></div><div id="inactive-queue-view"></div></div><div class="grid2 section"><div class="card p16"><h3>產業 Treemap</h3><div class="treemap">'+treemapHtml()+'</div></div><div class="card p16"><h3>會員等級分布</h3>'+bars(levelCounts(active),'level')+'</div></div><div class="card p16 section"><h3>成立年份趨勢</h3>'+yearBars(yearCounts(data.startups))+'</div>';
+ renderInactiveQueue();
+}
 function miniRows(arr,type,dateField='startText'){return arr.length?arr.map(x=>`<div class="list-row" onclick='openByName(${JSON.stringify(x.name)})'><b>${esc(x.name)}</b><span class="date">${esc(x[dateField]||'')}</span></div>`).join(''):'<div class="empty">目前無資料</div>'}
 function levelCounts(arr){const o={}; arr.forEach(m=>{const k=m.level||'未分類'; o[k]=(o[k]||0)+1}); return o}
 function yearCounts(arr){const o={}; arr.forEach(m=>{const k=m.startYear; if(k&&k!=='—')o[k]=(o[k]||0)+1}); return o}
