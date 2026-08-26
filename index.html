@@ -812,7 +812,7 @@ function normEvent(r){
  result:get(r,['活動成果','成果','成功案例','備註']),
  successCase:get(r,['媒合成功案例','成功案例']),
  status:get(r,['執行狀態','狀態']),
- year:get(r,['活動年度']),
+ year:get(r,['活動年度','年份','年度'])||(String(get(r,['_來源分頁'])||'').match(/(\\d{4})$/)?.[1]||''),
  services,
  serviceCount:Number(r.serviceCount||services.length||0),
  impactCount:Number(r.impactCount||participatingStartupBenefits.length||0),
