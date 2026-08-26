@@ -529,6 +529,7 @@ body{
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 const API_BASE='https://script.google.com/macros/s/AKfycby5BjSXDdBpEBFBwfGMnFAvcSCPganxrSSnRAfnmEGSPSY8Yupw2VKOfHl5NEoktaD2/exec';
+const EVENTS_API_BASE='https://script.google.com/macros/s/AKfycbzVTCi72JDF5lABtRHCN1WY9VFv6CT0XdLR6Gh7GSQpOWWJ92pi4TEPYGVqdIZZAz1RXg/exec';
 const DATA_SHEET_URL='https://docs.google.com/spreadsheets/d/1o8ptque1Vl24st1ZWa1zrngou6eXBNwD/edit';
 const MEMBER_SHEET_URL='https://docs.google.com/spreadsheets/d/1o8ptque1Vl24st1ZWa1zrngou6eXBNwD/edit';
 const MEMBER_SNAPSHOT_URL='./data/members.json';
@@ -858,7 +859,8 @@ function exportCurrentView(){
  XLSX.writeFile(wb,`IAPS_${safeFilePart(title)}_${todayText()}.xlsx`);
 }
 async function fetchType(type){
- const res=await fetch(`${API_BASE}?type=${type}`);
+ const base=type==='events'?EVENTS_API_BASE:API_BASE;
+ const res=await fetch(`${base}?type=${type}`);
  if(!res.ok)throw new Error(`${type}: HTTP ${res.status}`);
  const json=await res.json();
  // 相容目前 Apps Script：{status:'ok', data:[...]}
