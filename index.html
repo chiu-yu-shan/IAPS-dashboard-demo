@@ -667,7 +667,7 @@ function isServiceEventRelated(s){const item=String(s.serviceItem||s['服務項�
 function eventMatchKey(name,yr){return `${normalizeEventName(name)}::${String(yr||'')}`}
 function normalizeEventName(v){return String(v||'').replace(/\s/g,'').replace(/[，,。．.、:：;；｜|()（）【】\[\]「」『』\-–—_]/g,'').toLowerCase()}
 function serviceUniqueKey(s){return [s.company,s.date,s.timestamp,s.serviceItem,s.summary,s.eventKey||s.activityName].join('|')}
-function recalcEventServiceStats(ev){const services=Array.isArray(ev.services)?ev.services:[]; const benefits=services.filter(s=>s.hasImpact); return {...ev,services,serviceCount:services.length,impactCount:benefits.length,hasImpact:!!(ev.hasImpact||benefits.length),participatingStartupCount:new Set(services.map(s=>s.company).filter(Boolean)).size,participatingStartupBenefits:benefits}}
+function recalcEventServiceStats(ev){const services=Array.isArray(ev.services)?ev.services:[]; const benefits=services.filter(s=>s.hasImpact); const startupsList=[...new Set([...(ev.startupsList||[]),...services.map(s=>String(s.company||'').trim()).filter(Boolean)])]; return {...ev,services,startupsList,serviceCount:services.length,impactCount:benefits.length,hasImpact:!!(ev.hasImpact||benefits.length),participatingStartupCount:new Set(services.map(s=>s.company).filter(Boolean)).size,participatingStartupBenefits:benefits}}
 function buildEventsWithServiceForms(events,services){
  // 活動主檔與服務表單依「活動名稱＋年份」自動關聯。
  // 年份由活動分頁／活動欄位與服務表單的時間戳記判斷，不限特定年度。
