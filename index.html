@@ -1040,6 +1040,25 @@ function parseEventDate(d){
  const t=new Date(s);
  return isNaN(t)?null:t;
 }
+function companyMatchKey(value){
+ return String(value||'')
+  .replace(/[\s　]/g,'')
+  .replace(/[（(].*?[）)]/g,'')
+  .replace(/(股份有限公司|有限責任公司|有限公司|公司)$/,'')
+  .toLowerCase();
+}
+function findCompanyProfile(name){
+ const target=companyMatchKey(name);
+ if(target.length<2)return null;
+ const all=[...(data.startups||[]),...(data.alumni||[])];
+ const exact=all.filter(company=>companyMatchKey(company.name)===target);
+ if(exact.length===1)return exact[0];
+ const prefix=all.filter(company=>{
+  const candidate=companyMatchKey(company.name);
+  return candidate.startsWith(target)||target.startsWith(candidate);
+ });
+ return prefix.length===1?prefix[0]:null;
+}
 function renderEvents(){
  const el=document.getElementById('page-events');
  const years=[...new Set(data.events.map(e=>e.year).filter(Boolean))].sort((a,b)=>String(b).localeCompare(String(a)));
@@ -1076,7 +1095,7 @@ function applyEventFilters(){
  v.innerHTML=arr.length?arr.map((ev,i)=>{
   const id='ev-'+i;
   const startupRows=(ev.startupsList||[]).map(n=>{
-   const matched=data.startups.find(x=>x.name===n)||data.alumni.find(x=>x.name===n);
+   const matched=findCompanyProfile(n);
    return matched?`<a onclick='event.stopPropagation();openDetail(${JSON.stringify(matched.name)},${JSON.stringify(matched._type||'startups')})'>${esc(n)}</a>`:`<span>${esc(n)}</span>`;
   }).join('');
   const partnerRows=(ev.partnersList||[]).map(n=>`<span>${esc(n)}</span>`).join('');
