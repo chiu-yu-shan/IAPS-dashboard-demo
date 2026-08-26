@@ -669,23 +669,17 @@ function normalizeEventName(v){return String(v||'').replace(/\s/g,'').replace(/[
 function serviceUniqueKey(s){return [s.company,s.date,s.timestamp,s.serviceItem,s.summary,s.eventKey||s.activityName].join('|')}
 function recalcEventServiceStats(ev){const services=Array.isArray(ev.services)?ev.services:[]; const benefits=services.filter(s=>s.hasImpact); return {...ev,services,serviceCount:services.length,impactCount:benefits.length,hasImpact:!!(ev.hasImpact||benefits.length),participatingStartupCount:new Set(services.map(s=>s.company).filter(Boolean)).size,participatingStartupBenefits:benefits}}
 function buildEventsWithServiceForms(events,services){
- // 乾淨規則：
- // 1) 2025 活動只顯示活動表本身，不顯示服務紀錄 / 成效追蹤。
- // 2) 服務表單只用「時間戳記」判斷年份，且只建立 / 掛載 2026 的活動服務紀錄。
- const out=events.map(ev=>{
-  const evYear=String(ev.year||'');
-  if(evYear!=='2026'){
-   return {...ev,services:[],serviceCount:0,impactCount:0,hasImpact:!!ev.successCase,participatingStartupCount:0,participatingStartupBenefits:[]};
-  }
-  return recalcEventServiceStats({...ev,services:Array.isArray(ev.services)?[...ev.services]:[]});
- });
+ // 活動主檔與服務表單依「活動名稱＋年份」自動關聯。
+ // 年份由活動分頁／活動欄位與服務表單的時間戳記判斷，不限特定年度。
+ const out=events.map(ev=>recalcEventServiceStats({...ev,services:Array.isArray(ev.services)?[...ev.services]:[]}));
  const index={};
  out.forEach(ev=>{const k=eventMatchKey(ev.name,ev.year); if(ev.name&&ev.year&&!index[k])index[k]=ev});
  (services||[])
-  .filter(s=>isServiceEventRelated(s)&&serviceEventYear(s)==='2026')
+  .filter(s=>isServiceEventRelated(s))
   .forEach(s=>{
-   const name=serviceEventName(s); if(!name)return;
-   const yr='2026';
+   const name=serviceEventName(s);
+   const yr=serviceEventYear(s);
+   if(!name||!yr)return;
    const k=eventMatchKey(name,yr);
    let ev=index[k];
    if(!ev){
@@ -695,7 +689,7 @@ function buildEventsWithServiceForms(events,services){
    const seen=new Set((ev.services||[]).map(serviceUniqueKey));
    if(!seen.has(serviceUniqueKey(s))) ev.services.push(s);
   });
- return out.map(ev=>String(ev.year||'')==='2026'?recalcEventServiceStats(ev):ev);
+ return out.map(recalcEventServiceStats);
 }
 function heatLevel(count){if(count>=5)return 'high'; if(count>=2)return 'medium'; if(count===1)return 'low'; return 'none'}
 function heatDots(count){if(count>=5)return '● ● ●'; if(count>=2)return '● ● ○'; if(count===1)return '● ○ ○'; return '○ ○ ○'}
@@ -728,7 +722,6 @@ function serviceTimelineHtml(services){
  return services.map(s=>`<div class="service-record ${s.hasImpact?'impact':''}"><div class="service-record-head"><span>${serviceIcon(s.serviceType,s.serviceItem)}</span><span>${esc(dateOnly(s.timestamp||s.date)||'—')}</span><span>｜${esc(serviceLabel(s))}</span><span>｜${esc(s.owner||'—')}</span>${s.hasImpact?`<span class="tag impact">✓ ${esc(s.impactType||'有效益')}</span>`:''}</div><div class="service-record-body">${esc(s.summary||s.activityName||'尚無摘要')}</div>${s.evidenceLink?`<div class="service-record-link"><a href="${esc(s.evidenceLink)}" target="_blank" rel="noopener">查看佐證資料</a></div>`:''}</div>`).join('');
 }
 function eventServicesHtml(ev){
- if(String(ev.year||'')!=='2026')return '';
  const services=Array.isArray(ev.services)?ev.services:[];
  if(!services.length)return '';
  return `<div class="event-service-box"><div class="event-service-title">服務紀錄 / 成效追蹤</div><div class="event-service-summary"><span class="tag service">參與新創：${esc(ev.participatingStartupCount||0)} 家</span><span class="tag service">已建立服務紀錄：${esc(ev.serviceCount||0)} 筆</span>${ev.impactCount?`<span class="tag impact">有效益案例：${esc(ev.impactCount)} 筆</span>`:''}</div>${services.map(s=>`<div class="event-service-item ${s.hasImpact?'impact':''}"><div class="event-service-company">${esc(s.company||'未命名新創')}</div><div class="event-service-desc">${serviceIcon(s.serviceType,s.serviceItem)} ${esc(serviceLabel(s))}｜${esc(dateOnly(s.timestamp||s.date)||'—')}｜${esc(s.owner||'—')}</div><div class="event-service-desc">${esc(s.summary||s.activityName||'')}</div>${s.hasImpact?`<div class="tags"><span class="tag impact">✓ ${esc(s.impactType||'有效益')}</span></div>`:''}</div>`).join('')}</div>`;
@@ -1097,7 +1090,7 @@ function applyEventFilters(){
       <span><span class="ico">🏢</span>${esc(ev.host||'—')}</span>
       ${ev.successCase?`<span class="ok">✓ 媒合成功案例</span>`:''}${ev.serviceOnly?`<span class="ok">表單服務紀錄</span>`:''}
      </div>
-     ${String(ev.year||'')==='2026'&&ev.serviceCount?`<div class="event-service-summary"><span class="tag service">服務紀錄 ${esc(ev.serviceCount)} 筆</span><span class="tag service">參與新創 ${esc(ev.participatingStartupCount||0)} 家</span>${ev.impactCount?`<span class="tag impact">✓ 效益 ${esc(ev.impactCount)} 筆</span>`:''}</div>`:''}
+     ${ev.serviceCount?`<div class="event-service-summary"><span class="tag service">服務紀錄 ${esc(ev.serviceCount)} 筆</span><span class="tag service">參與新創 ${esc(ev.participatingStartupCount||0)} 家</span>${ev.impactCount?`<span class="tag impact">✓ 效益 ${esc(ev.impactCount)} 筆</span>`:''}</div>`:''}
     </div>
     ${ev.year?`<span class="event-year-tag">${esc(ev.year)}</span>`:''}
     <span class="event-chevron">▾</span>
