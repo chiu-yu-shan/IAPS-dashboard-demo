@@ -1096,7 +1096,7 @@ function applyEventFilters(){
   const id='ev-'+i;
   const startupRows=(ev.startupsList||[]).map(n=>{
    const matched=findCompanyProfile(n);
-   const label=String(ev.year||'')==='2025'?matched.name:n;
+   const label=String(ev.year||'')==='2025'&&matched?matched.name:n;
    return matched?`<a onclick='event.stopPropagation();openDetail(${JSON.stringify(matched.name)},${JSON.stringify(matched._type||'startups')})'>${esc(label)}</a>`:`<span>${esc(n)}</span>`;
   }).join('');
   const partnerRows=(ev.partnersList||[]).map(n=>`<span>${esc(n)}</span>`).join('');
