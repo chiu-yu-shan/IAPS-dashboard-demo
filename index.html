@@ -928,7 +928,6 @@ function inactiveMembers(){
 }
 function inactiveReason(row){return actionValue(row,['未啟動原因','未服務原因','長期未互動原因','原因','服務狀態'])}
 function inactiveDue(row){return actionValue(row,['預計處理日期','預計完成日','下一步日期','追蹤日期','Due Date'])}
-function inactiveRisk(row){return actionValue(row,['風險','風險／需協助','需協助','Risk'])}
 function inactiveOwner(row){return row.owner||actionValue(row,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])}
 function renderInactiveQueue(){
  const host=document.getElementById('inactive-queue-view'); if(!host)return;
@@ -951,7 +950,7 @@ function renderInactiveQueue(){
   if(sort==='owner')return String(inactiveOwner(a)).localeCompare(String(inactiveOwner(b)),'zh-Hant');
   const ad=dateStamp(inactiveDue(a))||Number.MAX_SAFE_INTEGER,bd=dateStamp(inactiveDue(b))||Number.MAX_SAFE_INTEGER;return ad-bd;
  });
- host.innerHTML=rows.length?rows.map(row=>'<div class="list-row queue-row" onclick=\'openByName('+JSON.stringify(row.name)+')\'><div style="min-width:0;width:100%"><div class="queue-row-top"><b>'+esc(row.name)+'</b><span class="date">'+esc(row._lastInteraction?new Date(row._lastInteraction).toLocaleDateString():'尚無互動紀錄')+'</span></div><div class="action-fields">'+actionChip('原因',inactiveReason(row))+actionChip('Owner',inactiveOwner(row))+actionChip('預計處理',inactiveDue(row))+actionChip('風險',inactiveRisk(row))+'</div></div></div>').join(''):'<div class="empty">沒有符合篩選條件的會員。</div>';
+ host.innerHTML=rows.length?rows.map(row=>'<div class="list-row queue-row" onclick=\'openByName('+JSON.stringify(row.name)+')\'><div style="min-width:0;width:100%"><div class="queue-row-top"><b>'+esc(row.name)+'</b><span class="date">'+esc(row._lastInteraction?new Date(row._lastInteraction).toLocaleDateString():'尚無互動紀錄')+'</span></div><div class="action-fields">'+actionChip('原因',inactiveReason(row))+actionChip('預計處理',inactiveDue(row))+actionChip('Owner',inactiveOwner(row))+'</div></div></div>').join(''):'<div class="empty">沒有符合篩選條件的會員。</div>';
 }
 function toggleInactiveQueue(){const panel=document.getElementById('inactive-queue-panel'),button=document.getElementById('inactive-queue-toggle');if(!panel||!button)return;const opening=panel.hidden;panel.hidden=!opening;button.setAttribute('aria-expanded',String(opening));button.textContent=opening?'收合工作佇列 ▴':'展開工作佇列 ▾'}
 function renderOverview(){
