@@ -897,7 +897,7 @@ function overviewMembers(){
  const base=data.members&&data.members.length?data.members:data.startups;
  return base.map(member=>{
   const profile=[...data.startups,...data.alumni].find(x=>x.name===member.name)||{};
-  return {...profile,...member,name:member.name||profile.name||'未命名會員',services:profile.services||member.services||[],lastServiceDate:profile.lastServiceDate||member.lastServiceDate||'',owner:get(member,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])||get(profile,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])||profile.manager||profile.founder||''};
+  return {...profile,...member,name:member.name||profile.name||'未命名會員',level:member.level||profile.level||'',services:profile.services||member.services||[],lastServiceDate:profile.lastServiceDate||member.lastServiceDate||'',owner:get(member,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])||get(profile,['Owner','服務 Owner','追蹤人員','負責 PIC','主責經理','負責人'])||profile.manager||profile.founder||''};
  });
 }
 function memberDateText(row,kind){const keys=kind==='start'?['起','起日','會員起日','合約起日','開始日期','入會日期','加入日期','Start Date']:['迄','迄日','會員迄日','合約迄日','結束日期','到期日','End Date'];return kind==='start'?(row.startText||row.contractStartText||get(row,keys)||''):(row.endText||row.contractEndText||get(row,keys)||'')}
