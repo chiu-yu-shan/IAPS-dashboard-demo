@@ -967,7 +967,7 @@ function renderOverview(){
  renderInactiveQueue();
 }
 function miniRows(arr,type,dateField='startText'){return arr.length?arr.map(x=>`<div class="list-row" onclick='openByName(${JSON.stringify(x.name)})'><b>${esc(x.name)}</b><span class="date">${esc(x[dateField]||'')}</span></div>`).join(''):'<div class="empty">目前無資料</div>'}
-function levelCounts(arr){const o={}; arr.forEach(m=>{const k=m.level||'未分類'; o[k]=(o[k]||0)+1}); return o}
+function levelCounts(arr){const o={}; const excluded=new Set(['未分類','體驗畢業']); arr.forEach(m=>{const k=m.level||'未分類'; if(!excluded.has(k))o[k]=(o[k]||0)+1}); return o}
 function yearCounts(arr){const o={}; arr.forEach(m=>{const k=m.startYear; if(k&&k!=='—')o[k]=(o[k]||0)+1}); return o}
 function tagCounts(){const o={}; data.startups.forEach(s=>s.industryTags.forEach(t=>o[t]=(o[t]||0)+1)); return o}
 function bars(obj,kind){const entries=Object.entries(obj).sort((a,b)=>b[1]-a[1]); const total=entries.reduce((s,x)=>s+x[1],0)||1; return entries.map(([k,v])=>`<div class="bar-row"><div>${esc(k)}</div><div class="bar-bg"><div class="bar-fill" style="width:${v/total*100}%"></div></div><div>${Math.round(v/total*100)}%</div></div>`).join('')||'<div class="empty">目前無資料</div>'}
